@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Song Request (Customer)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body{font-family:Arial;margin:20px;}
+    .row{display:flex;flex-wrap:wrap;gap:12px;}
+    .card{border:1px solid #ddd;border-radius:8px;padding:12px;width:280px;}
+    .card img{width:100%;border-radius:6px;}
+    .muted{color:#666;font-size:12px;}
+    input,button{padding:8px;}
+  </style>
+</head>
+<body>
+  <h2>🎵 Search your song</h2>
+  <p id="t"></p>
+
+  <input id="q" placeholder="Type song / movie / artist" onkeydown="if(event.key==='Enter') search()">
+  <button onclick="search()">Search</button>
+
+  <div id="results" class="row" style="margin-top:12px;"></div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const tableNo = Number(params.get("table") || 1);
+    document.getElementById("t").innerText = "Table #" + tableNo;
+    document.getElementById("q").focus();
+
+    const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/\'/g,"&#39;");
+
+    async function search(){
+      const q = document.getElementById("q").value.trim();
+      if(!q){ return; }
+      document.getElementById("results").innerHTML = "<div class='muted'>Searching…</div>";
+      const r = await fetch("/search-songs?q="+encodeURIComponent(q));
+      const list = await r.json();
+      document.getElementById("results").innerHTML = (list || []).map(x=>{
+        const url = `https://www.youtube.com/watch?v=${x.videoId}`;
+        return `
+          <div class="card">
+            ${x.thumbnail?`<img src="${esc(x.thumbnail)}" alt="">`:""}
+            <b>${esc(x.title || "Song")}</b><br>
+            <span class="muted">${esc(x.channel || "")}</span><br><br>
+            <button onclick="requestSong('${x.videoId}','${esc(x.title || "YouTube song")}','${esc(url)}')">Request</button>
+          </div>
+        `;
+      }).join("") || "<div class='muted'>No results.</div>";
+    }
+
+    async function requestSong(songId, songTitle, songUrl){
+      const r = await fetch("/request", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ tableNo, songId, songTitle, songUrl })
+      });
+      const data = await r.json();
+      alert(r.ok ? `✅ Requested: ${data.songName}` : `❌ ${data.message || data.error}`);
+    }
+  </script>
+</body>
+</html>
+

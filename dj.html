@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>DJ Panel</title>
+  <style>
+    body{font-family:Arial;margin:20px;}
+    .card{border:1px solid #ccc;border-radius:8px;padding:10px;margin:10px 0;}
+    .muted{color:#777;font-size:12px;}
+    button{padding:6px 10px;cursor:pointer;}
+  </style>
+</head>
+<body>
+  <h2>🎧 DJ Panel</h2>
+  <div id="list"></div>
+
+  <script>
+    function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/\'/g,"&#39;");}
+
+    async function load(){
+      const r = await fetch("/requests?status=PENDING");
+      const list = await r.json();
+      document.getElementById("list").innerHTML =
+        (list||[]).map(x=>`
+          <div class="card" id="req-${x.id}">
+            <b>${esc(x.songName || "(Song)")}</b>
+            <div class="muted">Table ${x.tableNo} • ${new Date(x.createdAt).toLocaleTimeString()}</div>
+            <button onclick="playNow(${x.id}, '${encodeURIComponent(x.songUrl || "")}', '${encodeURIComponent(x.songName || "")}')">PLAY</button>
+          </div>
+        `).join("") || "<p class='muted'>No pending songs</p>";
+    }
+
+    function playNow(id, encUrl, encTitle){
+      const url = decodeURIComponent(encUrl);
+      const title = decodeURIComponent(encTitle);
+      const finalUrl = url || ("https://www.youtube.com/results?search_query=" + encodeURIComponent(title));
+      window.open(finalUrl, "_blank"); // user click → popup blocker safe
+      doneAndRemove(id); // auto-DONE
+    }
+
+    async function doneAndRemove(id){
+      try{
+        await fetch(`/requests/${id}/status`, {
+          method:"PATCH",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ status:"DONE" })
+        });
+      }catch(e){ console.error(e); }
+      const card = document.getElementById("req-"+id);
+      if(card) card.remove();
+    }
+
+    load();
+    setInterval(load, 2000);
+  </script>
+</body>
+</html>
+
